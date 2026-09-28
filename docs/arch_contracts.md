@@ -16,6 +16,7 @@ protocols, and extension interfaces in SqueezeNest.
 from squeezenest.api.models import (
     NestingJob,
     NestingResult,
+    NestingStrategy,
     PlacementLayout,
     PlacedPart,
     SensitivityConfig,
@@ -37,7 +38,7 @@ from squeezenest.api.protocols import (
 )
 
 __all__ = [
-    "NestingJob", "NestingResult", "PlacementLayout", "PlacedPart",
+    "NestingJob", "NestingResult", "NestingStrategy", "PlacementLayout", "PlacedPart",
     "SensitivityConfig", "SensitivityResult", "ParetoPoint",
     "ValidationReport", "Violation", "ViolationSeverity", "ViolationCode",
     "PartMetadata", "StockSheet", "RotationSet",

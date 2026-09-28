@@ -351,6 +351,7 @@ squeezenest/
 |   +-- graph_stitch.py       # KD-Tree endpoint snapping & chain assembly
 |   +-- dxf_export.py         # Multi-layer CAM DXF writer
 +-- _nesting/                 # Private placement engine
+|   +-- _geometry.py          # Shared polygon/rotation primitives
 |   +-- bounding.py           # AABB / OBB / convex hull filter cascade
 |   +-- nfp.py                # NFP computation & cache integration
 |   +-- blf.py                # Bottom-Left-Fill + Beam Search

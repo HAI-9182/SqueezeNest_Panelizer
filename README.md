@@ -11,7 +11,8 @@ SqueezeNest is a Python library for packing 2D irregular polygons onto a rectang
 ### 1. Basic 2D Irregular Nesting (Bottom-Left Fill)
 
 ```python
-from squeezenest.api.models import StockSheet, RotationSet, NestingStrategy
+from squeezenest.api import NestingStrategy
+from squeezenest.api.models import StockSheet, RotationSet
 from squeezenest._nesting.blf import run_nesting_job
 
 # Define stock sheet (100x100 mm)
@@ -39,7 +40,8 @@ print(f"Placed {layout.yield_count} parts.")
 For homogeneous parts (e.g., mass-producing the exact same L-shape bracket), SqueezeNest provides a `Lattice Tiling` engine. It pairs parts into tightest interlocking clusters (e.g. Yin-Yang patterns) and mathematically tiles them to maximize density. The algorithm automatically evaluates all allowed global rotations of the cluster to ensure the tiling grid optimally aligns with the stock sheet dimensions.
 
 ```python
-from squeezenest.api.models import NestingJob, NestingStrategy
+from squeezenest.api import NestingStrategy
+from squeezenest.api.models import NestingJob, PartMetadata
 
 job = NestingJob(
     parts={"L": (l_shape, PartMetadata(part_id="L", quantity=40))},
