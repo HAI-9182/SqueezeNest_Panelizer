@@ -18,11 +18,16 @@ All coordinates are int64 scale units (see squeezenest._core.scale).
 from __future__ import annotations
 
 import hashlib
+import sqlite3
 import struct
+import time
 from collections import OrderedDict
+from pathlib import Path
 from typing import Any
 
-__all__ = ["make_cache_key", "NFPCache"]
+import msgpack
+
+__all__ = ["make_cache_key", "NFPCache", "SQLiteNFPCache", "TieredNFPCache"]
 
 # Type aliases
 Polygon = list[tuple[int, int]]
@@ -129,27 +134,33 @@ class NFPCache:
     def __len__(self) -> int:
         return len(self._store)
 
+
 # ---------------------------------------------------------------------------
 # SQLite Cache (Tier 2)
 # ---------------------------------------------------------------------------
 
-import sqlite3
-import msgpack
-import time
-from pathlib import Path
-
 class SQLiteNFPCache:
     """On-disk SQLite cache for No-Fit Polygon results.
-    
-    Implements an LRU eviction policy with a maximum of 100 entries.
+
+    Implements an LRU eviction policy using a ``last_accessed_at`` timestamp.
+    The connection is opened with ``check_same_thread=False`` so the cache
+    can be passed across threads (callers are responsible for external locking
+    in concurrent scenarios).  Always close the cache via :meth:`close` or
+    use it as a context manager to release the file handle.
+
+    Args:
+        db_path:  Path to the SQLite database file (created if absent).
+        max_size: Maximum number of NFP entries to retain (default: 100).
     """
-    
+
     def __init__(self, db_path: Path, max_size: int = 100) -> None:
         self.db_path = db_path
         self._max_size = max_size
-        self._conn = sqlite3.connect(self.db_path)
+        # check_same_thread=False allows cross-thread use; callers must
+        # ensure external serialisation when sharing across threads.
+        self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._init_db()
-        
+
     def _init_db(self) -> None:
         with self._conn:
             self._conn.execute(
@@ -159,9 +170,9 @@ class SQLiteNFPCache:
                     last_accessed_at REAL
                 )'''
             )
-            # Create an index on last_accessed_at for fast eviction queries
+            # Index on last_accessed_at for fast eviction queries
             self._conn.execute(
-                '''CREATE INDEX IF NOT EXISTS idx_last_accessed 
+                '''CREATE INDEX IF NOT EXISTS idx_last_accessed
                    ON nfp_cache(last_accessed_at)'''
             )
 
@@ -173,14 +184,14 @@ class SQLiteNFPCache:
         row = cur.fetchone()
         if row is None:
             return None
-            
+
         # Update last_accessed_at on cache hit
         with self._conn:
             self._conn.execute(
                 "UPDATE nfp_cache SET last_accessed_at = ? WHERE hash_key = ?",
                 (time.time(), key)
             )
-            
+
         return msgpack.unpackb(row[0])
 
     def put(self, key: str, value: Any) -> None:
@@ -188,9 +199,9 @@ class SQLiteNFPCache:
         with self._conn:
             # Upsert
             self._conn.execute(
-                '''INSERT INTO nfp_cache (hash_key, data, last_accessed_at) 
+                '''INSERT INTO nfp_cache (hash_key, data, last_accessed_at)
                    VALUES (?, ?, ?)
-                   ON CONFLICT(hash_key) DO UPDATE SET 
+                   ON CONFLICT(hash_key) DO UPDATE SET
                    data=excluded.data, last_accessed_at=excluded.last_accessed_at''',
                 (key, packed, time.time())
             )
@@ -202,14 +213,14 @@ class SQLiteNFPCache:
             cur = self._conn.cursor()
             cur.execute("SELECT COUNT(*) FROM nfp_cache")
             count = cur.fetchone()[0]
-            
+
             if count > self._max_size:
                 excess = count - self._max_size
                 self._conn.execute(
-                    '''DELETE FROM nfp_cache 
+                    '''DELETE FROM nfp_cache
                        WHERE hash_key IN (
-                           SELECT hash_key FROM nfp_cache 
-                           ORDER BY last_accessed_at ASC 
+                           SELECT hash_key FROM nfp_cache
+                           ORDER BY last_accessed_at ASC
                            LIMIT ?
                        )''', (excess,)
                 )
@@ -219,22 +230,57 @@ class SQLiteNFPCache:
         cur.execute("SELECT COUNT(*) FROM nfp_cache")
         return cur.fetchone()[0]
 
+    def close(self) -> None:
+        """Close the underlying SQLite connection and release the file handle."""
+        self._conn.close()
+
+    def __enter__(self) -> "SQLiteNFPCache":
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
+
+
+# ---------------------------------------------------------------------------
+# Tiered Cache (Tier 1 + Tier 2)
+# ---------------------------------------------------------------------------
+
 class TieredNFPCache:
-    """Wrapper that combines Tier 1 (LRU) and Tier 2 (SQLite) caches."""
-    def __init__(self, mem_size: int, db_path: Path, db_size: int = 100):
+    """Wrapper that combines Tier 1 (in-process LRU) and Tier 2 (SQLite) caches.
+
+    A cache hit in Tier 1 avoids the SQLite round-trip.  A hit in Tier 2
+    back-fills Tier 1 so subsequent lookups are served from memory.
+
+    Args:
+        mem_size: Maximum entries for the in-process LRU cache (Tier 1).
+        db_path:  Path to the SQLite database file (Tier 2).
+        db_size:  Maximum entries for the SQLite cache (Tier 2, default: 100).
+    """
+
+    def __init__(self, mem_size: int, db_path: Path, db_size: int = 100) -> None:
         self.t1 = NFPCache(mem_size)
         self.t2 = SQLiteNFPCache(db_path, max_size=db_size)
-        
+
     def get(self, key: str) -> Any | None:
         val = self.t1.get(key)
         if val is not None:
             return val
-            
+
         val = self.t2.get(key)
         if val is not None:
             self.t1.put(key, val)
         return val
-        
+
     def put(self, key: str, value: Any) -> None:
         self.t1.put(key, value)
         self.t2.put(key, value)
+
+    def close(self) -> None:
+        """Close the Tier 2 SQLite connection."""
+        self.t2.close()
+
+    def __enter__(self) -> "TieredNFPCache":
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()

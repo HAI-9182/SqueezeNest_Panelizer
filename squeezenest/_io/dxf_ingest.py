@@ -89,7 +89,19 @@ def ingest_dxf(
     # ------------------------------------------------------------------
     # Stage 4: Graph walk to find closed contours
     # ------------------------------------------------------------------
-    contours, gap_segs = _extract_closed_contours(snapped, eps_snap_mm)
+    contours, gap_segs, dup_segs = _extract_closed_contours(snapped, eps_snap_mm)
+
+    # Emit DXF_DUPLICATE_SEGMENT_002 for segments found to be exact duplicates
+    for seg in dup_segs:
+        violations.append(Violation(
+            code=ViolationCode.DXF_DUPLICATE_SEGMENT_002,
+            severity=ViolationSeverity.WARNING,
+            message=(
+                f"Duplicate segment between ({seg[0][0]:.4f},{seg[0][1]:.4f}) "
+                f"and ({seg[1][0]:.4f},{seg[1][1]:.4f}) — second copy ignored."
+            ),
+            locus=(seg[0][0], seg[0][1], seg[1][0], seg[1][1]),
+        ))
 
     # Emit DXF_GAP_001 for any unclosed segments remaining after snapping
     for seg in gap_segs:
@@ -219,26 +231,34 @@ def _build_adjacency(
 def _extract_closed_contours(
     segments: list[Segment],
     eps_snap_mm: float,
-) -> tuple[list[Polygon], list[Segment]]:
+) -> tuple[list[Polygon], list[Segment], list[Segment]]:
     """Walk the segment graph to extract closed contours.
 
     Returns:
-        (closed_contours, gap_segments)
+        (closed_contours, gap_segments, duplicate_segments)
         gap_segments are segments whose endpoints don't connect to form a ring.
+        duplicate_segments are segments discarded as exact duplicates after snapping.
     """
-    # Build edge set as (start, end) pairs
-    remaining: set[tuple[tuple[float, float], tuple[float, float]]] = set()
-    for p0, p1 in segments:
-        remaining.add((p0, p1))
-        remaining.add((p1, p0))  # bidirectional
+    # De-duplicate and record which segments were duplicates
+    seen_edges: set[tuple[tuple[float, float], tuple[float, float]]] = set()
+    unique_segments: list[Segment] = []
+    duplicate_segments: list[Segment] = []
+    for seg in segments:
+        p0, p1 = seg
+        canonical = (min(p0, p1), max(p0, p1))
+        if canonical in seen_edges:
+            duplicate_segments.append(seg)
+        else:
+            seen_edges.add(canonical)
+            unique_segments.append(seg)
 
-    # Build adjacency
-    adj = _build_adjacency(segments, eps_snap_mm)
+    # Build adjacency over unique segments only
+    adj = _build_adjacency(unique_segments, eps_snap_mm)
 
     visited_edges: set[frozenset] = set()
     contours: list[Polygon] = []
 
-    for seg in segments:
+    for seg in unique_segments:
         p0, p1 = seg
         edge_key = frozenset([p0, p1])
         if edge_key in visited_edges:
@@ -253,17 +273,17 @@ def _extract_closed_contours(
     # Segments in unclosed chains = gap segments
     # A segment is a "gap" if its endpoints have degree != 2 (dangling)
     degree: dict[tuple[float, float], int] = {}
-    for p0, p1 in segments:
+    for p0, p1 in unique_segments:
         degree[p0] = degree.get(p0, 0) + 1
         degree[p1] = degree.get(p1, 0) + 1
 
     gap_segments: list[Segment] = []
-    for p0, p1 in segments:
+    for p0, p1 in unique_segments:
         # If either endpoint has degree 1 (dead end), it's part of an open chain
         if degree.get(p0, 0) == 1 or degree.get(p1, 0) == 1:
             gap_segments.append((p0, p1))
 
-    return contours, gap_segments
+    return contours, gap_segments, duplicate_segments
 
 
 def _walk_ring(
@@ -272,29 +292,38 @@ def _walk_ring(
     adj: dict[tuple[float, float], list[tuple[float, float]]],
     visited_edges: set[frozenset],
 ) -> Optional[Polygon]:
-    """Walk from start through second, attempting to close a ring back to start."""
+    """Walk from start through second, attempting to close a ring back to start.
+
+    The walk is bounded to ``len(adj) + 1`` steps — the maximum number of
+    vertices a valid simple ring can visit in this graph.  Non-manifold
+    vertices (degree > 2) are handled by preferring neighbours that would
+    close the ring, then any unvisited neighbour.
+    """
     ring: Polygon = [start, second]
     prev = start
     curr = second
 
-    for _ in range(len(adj) + 2):  # bounded walk to prevent infinite loops
+    # Safe upper bound: a simple ring visits at most every vertex once.
+    for _ in range(len(adj) + 1):
         neighbours = [n for n in adj.get(curr, []) if n != prev]
         if not neighbours:
             return None  # Dead end
 
-        # Choose the neighbour that closes the ring first, else first unvisited
+        # Prefer a neighbour that closes the ring
+        closing = [nb for nb in neighbours if nb == start and len(ring) >= 3]
+        if closing:
+            return ring  # Closed!
+
+        # Among remaining neighbours, pick the first unvisited edge
         next_pt: Optional[tuple[float, float]] = None
         for nb in neighbours:
-            if nb == start and len(ring) >= 3:
-                # Closed!
-                return ring
             edge_key = frozenset([curr, nb])
             if edge_key not in visited_edges:
                 next_pt = nb
                 break
 
         if next_pt is None:
-            return None  # No unvisited onward edge
+            return None  # No unvisited onward edge (dead end in graph)
 
         edge_key = frozenset([curr, next_pt])
         visited_edges.add(edge_key)

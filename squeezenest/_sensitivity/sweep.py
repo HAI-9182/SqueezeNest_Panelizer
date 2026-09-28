@@ -33,7 +33,7 @@ from squeezenest.api.models import (
 from squeezenest._sensitivity.affine import scale_polygon
 from squeezenest._sensitivity.pareto import extract_pareto
 from squeezenest._nesting.blf import bottom_left_fill
-from squeezenest._core.scale import to_int
+from squeezenest._core.scale import to_int, SCALE
 
 __all__ = ["run_sensitivity_sweep"]
 
@@ -57,12 +57,12 @@ def _scale_parts(
         # Convert to int64, scale, convert back to float mm
         outer_int = [(to_int(x), to_int(y)) for x, y in outer]
         scaled_int = scale_polygon(outer_int, sx=sx, sy=sy)
-        scaled_outer = [(x / 1_000_000, y / 1_000_000) for x, y in scaled_int]
+        scaled_outer = [(x / SCALE, y / SCALE) for x, y in scaled_int]
         holes_scaled = []
         for hole in holes:
             hole_int = [(to_int(x), to_int(y)) for x, y in hole]
             hole_scaled_int = scale_polygon(hole_int, sx=sx, sy=sy)
-            holes_scaled.append([(x / 1_000_000, y / 1_000_000) for x, y in hole_scaled_int])
+            holes_scaled.append([(x / SCALE, y / SCALE) for x, y in hole_scaled_int])
         scaled[part_id] = ((scaled_outer, holes_scaled), meta)
     return scaled
 

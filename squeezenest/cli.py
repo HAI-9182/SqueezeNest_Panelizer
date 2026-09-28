@@ -9,6 +9,13 @@ app = typer.Typer(
     help="General-purpose 2D irregular nesting and dimensional sensitivity engine."
 )
 
+
+def _print_report_errors(report: "ValidationReport") -> None:  # type: ignore[name-defined]
+    """Print all ERROR-severity violations to stderr."""
+    from squeezenest.api.models import ValidationReport  # noqa: PLC0415
+    for err in report.errors():
+        typer.echo(f" - [{err.code.value}] {err.message}", err=True)
+
 @app.command()
 def nest(
     dxf: Path = typer.Argument(..., help="Path to the input DXF file"),
@@ -29,8 +36,7 @@ def nest(
     parts, report = ingest_dxf(dxf, eps_snap_mm=0.01)
     if report.is_fatal:
         typer.echo("Fatal errors during DXF ingestion.", err=True)
-        for err in report.errors():
-            typer.echo(f" - {err.message}", err=True)
+        _print_report_errors(report)
         raise typer.Exit(code=1)
         
     typer.echo(f"Successfully ingested {len(parts)} parts.")
@@ -75,6 +81,7 @@ def sweep(
     parts, report = ingest_dxf(dxf, eps_snap_mm=0.01)
     if report.is_fatal:
         typer.echo("Fatal errors during DXF ingestion.", err=True)
+        _print_report_errors(report)
         raise typer.Exit(code=1)
         
     job_parts = {f"P{i}": (p, PartMetadata(part_id=f"P{i}")) for i, p in enumerate(parts)}

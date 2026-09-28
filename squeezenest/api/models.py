@@ -5,10 +5,11 @@ Internal int64 grid conversion is handled transparently by _core.scale.
 """
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Sequence
 from pathlib import Path
+from typing import Optional, Sequence
 
 
 # ---------------------------------------------------------------------------
@@ -115,8 +116,9 @@ class ValidationReport:
         cls, violations: Sequence[Violation], strict: bool = True
     ) -> "ValidationReport":
         """Construct a report from a sequence of Violation objects."""
-        errors   = sum(1 for v in violations if v.severity == ViolationSeverity.ERROR)
-        warnings = sum(1 for v in violations if v.severity == ViolationSeverity.WARNING)
+        counts = Counter(v.severity for v in violations)
+        errors   = counts[ViolationSeverity.ERROR]
+        warnings = counts[ViolationSeverity.WARNING]
         return cls(
             violations=tuple(violations),
             error_count=errors,

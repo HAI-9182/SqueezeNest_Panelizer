@@ -14,9 +14,14 @@ Invariant I-07: The returned frontier contains no dominated points.
 """
 from __future__ import annotations
 
+import logging
+
 from squeezenest.api.models import ParetoPoint
 
 __all__ = ["extract_pareto"]
+
+_log = logging.getLogger(__name__)
+_LARGE_GRID_THRESHOLD = 5_000
 
 
 def extract_pareto(points: list[ParetoPoint]) -> list[ParetoPoint]:
@@ -32,6 +37,13 @@ def extract_pareto(points: list[ParetoPoint]) -> list[ParetoPoint]:
     """
     if not points:
         return []
+
+    if len(points) > _LARGE_GRID_THRESHOLD:
+        _log.warning(
+            "extract_pareto received %d points — O(n²) dominance check may be slow. "
+            "Consider reducing n_scale_x / n_scale_y / n_clearance in SensitivityConfig.",
+            len(points),
+        )
 
     frontier: list[ParetoPoint] = []
 
