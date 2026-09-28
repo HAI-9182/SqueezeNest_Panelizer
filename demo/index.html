@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SqueezeNest — 2D PCB Panelization Studio</title>
+  <title>SqueezeNest — 2D CNC Panelization Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -23,10 +23,10 @@
       --accent-amber: #f59e0b;
       --accent-purple: #8b5cf6;
       --danger: #ef4444;
-      --pcb-substrate: #0e1e17;
-      --pcb-mask: rgba(16, 185, 129, 0.3);
-      --pcb-mask-stroke: #10b981;
-      --pcb-hole: #060b09;
+      --cnc-stock material: #0e1e17;
+      --cnc-mask: rgba(16, 185, 129, 0.3);
+      --cnc-mask-stroke: #10b981;
+      --cnc-hole: #060b09;
       --panel-border: #fbbf24;
       --font-ui: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
@@ -843,7 +843,7 @@
       </div>
       <div class="logo-text">
         <h1>SqueezeNest</h1>
-        <span>PCB Panelization Studio</span>
+        <span>CNC Panelization Studio</span>
       </div>
     </div>
 
@@ -988,7 +988,7 @@
       <!-- DXF File Uploads -->
       <section class="card">
         <div class="card-title">
-          <span>PCB DXF Files</span>
+          <span>CNC DXF Files</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
@@ -1111,7 +1111,7 @@
           </div>
           <div class="legend-item">
             <div class="legend-color" style="background: rgba(16, 185, 129, 0.4); border: 1px solid #10b981;"></div>
-            <span>PCB Outline</span>
+            <span>CNC Outline</span>
           </div>
           <div class="legend-item">
             <div class="legend-color" style="background: #060b09; border: 1px solid #38bdf8;"></div>
@@ -1123,21 +1123,21 @@
         <svg id="preview-svg" viewBox="0 0 150 150">
           <defs>
             <!-- Background Grid Pattern -->
-            <pattern id="pcb-grid" width="10" height="10" patternUnits="userSpaceOnUse">
+            <pattern id="cnc-grid" width="10" height="10" patternUnits="userSpaceOnUse">
               <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255, 255, 255, 0.05)" stroke-width="0.3"/>
             </pattern>
-            <pattern id="pcb-grid-major" width="50" height="50" patternUnits="userSpaceOnUse">
-              <rect width="50" height="50" fill="url(#pcb-grid)" />
+            <pattern id="cnc-grid-major" width="50" height="50" patternUnits="userSpaceOnUse">
+              <rect width="50" height="50" fill="url(#cnc-grid)" />
               <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(16, 185, 129, 0.15)" stroke-width="0.6"/>
             </pattern>
           </defs>
 
           <!-- Transform Root for Pan & Zoom -->
           <g id="viewport-group">
-            <!-- Background substrate -->
-            <rect id="substrate-rect" x="0" y="0" width="150" height="150" fill="#0c1712" stroke="#fbbf24" stroke-width="0.8"/>
+            <!-- Background stock material -->
+            <rect id="stock material-rect" x="0" y="0" width="150" height="150" fill="#0c1712" stroke="#fbbf24" stroke-width="0.8"/>
             <!-- Grid overlay -->
-            <rect id="grid-rect" x="0" y="0" width="150" height="150" fill="url(#pcb-grid-major)"/>
+            <rect id="grid-rect" x="0" y="0" width="150" height="150" fill="url(#cnc-grid-major)"/>
             
             <!-- Placed parts container -->
             <g id="parts-group"></g>
@@ -1150,7 +1150,7 @@
             <rect x="3" y="3" width="18" height="18" rx="2"/>
             <path d="M9 3v18M3 9h18"/>
           </svg>
-          <h3>Ready for PCB Panelization</h3>
+          <h3>Ready for CNC Panelization</h3>
           <p>Load a sample CAD DXF or upload your board files on the left, then click <strong>Optimize Panel Layout</strong>.</p>
         </div>
 
@@ -1232,7 +1232,7 @@
     const fileListEl = document.getElementById('file-list');
     const svgEl = document.getElementById('preview-svg');
     const viewportGroup = document.getElementById('viewport-group');
-    const substrateRect = document.getElementById('substrate-rect');
+    const stock materialRect = document.getElementById('stock material-rect');
     const gridRect = document.getElementById('grid-rect');
     const partsGroup = document.getElementById('parts-group');
     const emptyState = document.getElementById('empty-state');
@@ -1439,8 +1439,8 @@
       const W = parseFloat(document.getElementById('panel-width').value) || 150;
       const H = parseFloat(document.getElementById('panel-height').value) || 150;
       svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
-      substrateRect.setAttribute('width', W);
-      substrateRect.setAttribute('height', H);
+      stock materialRect.setAttribute('width', W);
+      stock materialRect.setAttribute('height', H);
       gridRect.setAttribute('width', W);
       gridRect.setAttribute('height', H);
       document.getElementById('stat-panel-size').textContent = `${W} × ${H}`;
@@ -1569,10 +1569,10 @@
       const H = data.panel.height_mm;
       const clearance = data.clearance_mm;
 
-      // Update ViewBox and substrates
+      // Update ViewBox and stock materials
       svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
-      substrateRect.setAttribute('width', W);
-      substrateRect.setAttribute('height', H);
+      stock materialRect.setAttribute('width', W);
+      stock materialRect.setAttribute('height', H);
       gridRect.setAttribute('width', W);
       gridRect.setAttribute('height', H);
 
@@ -1640,7 +1640,7 @@
           partG.appendChild(halo);
         }
 
-        // 2. Outer PCB body (emerald / cyan solder mask)
+        // 2. Outer CNC body (emerald / cyan stock material)
         const outerPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         outerPath.setAttribute('d', outerD);
         outerPath.setAttribute('fill', 'rgba(16, 185, 129, 0.35)');

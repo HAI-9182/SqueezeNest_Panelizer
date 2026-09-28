@@ -1,4 +1,4 @@
-# SqueezeNest PCB Panelization Demo & Benchmark Analysis
+# SqueezeNest CNC Panelization Demo & Benchmark Analysis
 
 This document provides both the complete **user guide** for running the interactive 2D web panelizer and the **empirical benchmark analysis** comparing greedy Bottom-Left Fill (BLF) against optimal nesting.
 
@@ -14,7 +14,7 @@ The demo is a zero-dependency local web application that runs directly on top of
 - **Configurable Panel Dimensions**: Width and height inputs with presets (100x100mm, Eurocard 100x160mm, 150x150mm, 200x200mm, etc.).
 - **Clearance & Router Kerf**: Custom tool diameter spacing (0.5mm, 1.5mm, 2.0mm, 2.4mm).
 - **Interactive 2D Vector Preview (SVG)**:
-  - High-contrast solder mask PCB rendering with internal cutouts/holes.
+  - High-contrast stock material CNC rendering with internal cutouts/holes.
   - Coordinate grid (10mm / 50mm).
   - Toggleable clearance halos and part ID labels.
   - Mouse pan & scroll wheel zoom.
@@ -56,7 +56,7 @@ Then open your browser at:
    - **Endpoint Gap Snapping**: Set snap tolerance (`0.05mm` default, or `0.1mm` / `0.5mm` if CAD files have loose corners).
    - **Rotation Freedom**: Select `Orthogonal (0°, 90°, 180°, 270°)` or `Fixed Upright (0° only)`.
    - **Upper Limit Timer**: Select maximum allowable runtime (e.g., `30s`).
-3. **Load PCB Geometries**:
+3. **Load CNC Geometries**:
    - Drag and drop your `.dxf` file into the drop zone, OR
    - Click one of the quick sample buttons: `⚡ Load Washer (with Cutout)` or `⚡ 3-Part Set`.
 4. **Click "⚡ Optimize Panel Layout"**:
@@ -72,7 +72,7 @@ Then open your browser at:
 
 # Part 2: Benchmark Test & Geometric Analysis
 
-This section records empirical benchmark results, visual observations, and geometric analysis of testing SqueezeNest v0.1.0 on a real-world irregular PCB panelization run.
+This section records empirical benchmark results, visual observations, and geometric analysis of testing SqueezeNest v0.1.0 on a real-world irregular CNC panelization run.
 
 ---
 
@@ -80,7 +80,7 @@ This section records empirical benchmark results, visual observations, and geome
 
 | Parameter | Value | Notes |
 |---|---|---|
-| **Board Geometry** | Custom irregular tapered PCB | Wedge / teardrop profile with connector tab at top |
+| **Board Geometry** | Custom irregular tapered CNC | Wedge / teardrop profile with connector tab at top |
 | **Panel Dimensions** | $100.0 \times 100.0\text{ mm}$ | Total panel area: $10{,}000\text{ mm}^2$ |
 | **Router Kerf / Clearance** | $2.0\text{ mm}$ | Standard mechanical CNC routing tool diameter |
 | **Rotation Freedom** | Orthogonal ($0^\circ, 90^\circ, 180^\circ, 270^\circ$) | 4 discrete $90^\circ$ rotational steps |
@@ -109,7 +109,7 @@ This section records empirical benchmark results, visual observations, and geome
 2. **Missing Interlocking (The "Yin-Yang" Opportunity)**:
    - The tested board features a pronounced tapered profile: narrow at the bottom (chin) and wide at the top (ears/tab).
    - In 2D irregular nesting, tapered geometries are prime candidates for **$180^\circ$ interlocking (head-to-tail nesting)**: flipping alternating boards upside-down allows the narrow bottom of one board to nestle between the wide ears of its neighbors.
-   - Because all boards were kept upright, the wide tops collided with adjacent tops, leaving large triangular "valleys" of empty, wasted PCB substrate around the lower half of each board.
+   - Because all boards were kept upright, the wide tops collided with adjacent tops, leaving large triangular "valleys" of empty, wasted CNC stock material around the lower half of each board.
 
 ---
 
@@ -160,4 +160,4 @@ When a panel nears saturation:
 3. **Genetic Algorithm / Beam Search (v0.2)**:
    - Activate `_nesting/ga.py` and `NestingJob(beam_width > 1)` to explore multiple placement permutations.
 4. **SqueezeNest Sensitivity Integration ("Squeeze-to-Fit")**:
-   - Use `run_sensitivity_sweep()`: if the PCB's mechanical outline allows a slight non-critical dimensional tolerance (e.g. $98.5\%$ scale), an extra column of interlocking parts could easily squeeze onto the $100\text{ mm}$ panel edge.
+   - Use `run_sensitivity_sweep()`: if the CNC's mechanical outline allows a slight non-critical dimensional tolerance (e.g. $98.5\%$ scale), an extra column of interlocking parts could easily squeeze onto the $100\text{ mm}$ panel edge.

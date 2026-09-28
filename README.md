@@ -92,7 +92,7 @@ best = sweep_result.best_yield()
 print(f"Max Yield achieved: {best.yield_count} (scale_x={best.scale_x:.2f}, scale_y={best.scale_y:.2f})")
 ```
 
-### 4. Interactive PCB Panelization Web Demo
+### 4. Interactive CNC Panelization Web Demo
 
 SqueezeNest includes an interactive local web studio to test panelization with custom `.dxf` CAD files, live 2D vector preview (SVG), stop controls, timeout protection, and direct DXF panel export. The "Maximize Yield" mode scales dynamically based on the theoretical maximum part count matching your sheet size without artificial caps.
 

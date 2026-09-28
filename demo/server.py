@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SqueezeNest PCB Panelization Demo Server.
+"""SqueezeNest CNC Panelization Demo Server.
 
 Provides a lightweight, zero-external-dependency web server for testing
 SqueezeNest with real DXF files, interactive 2D graphical preview (SVG),
@@ -82,7 +82,7 @@ def _sanitize_filename(name: str, fallback: str = "part.dxf") -> str:
 def _normalize_dxf_document(doc: ezdxf.document.Drawing) -> dict[str, Any]:
     """Preprocess DXF to ensure compatibility with squeezenest._io.dxf_ingest.
     
-    1. Explodes INSERT block references (common in PCB exports).
+    1. Explodes INSERT block references (common in CNC exports).
     2. Converts old-style 2D POLYLINE entities to modern LWPOLYLINE.
     3. Flattens SPLINE curves into discrete LWPOLYLINE segments.
     4. Gathers entity & layer statistics for diagnostics.
@@ -171,28 +171,28 @@ def _build_panel_dxf(
     panel_h: float,
     placements_data: list[dict[str, Any]],
 ) -> bytes:
-    """Generate a clean DXF R2010 file with panel outline, PCB outlines, and cutouts/holes."""
+    """Generate a clean DXF R2010 file with panel outline, CNC outlines, and cutouts/holes."""
     doc = ezdxf.new("R2010")
     msp = doc.modelspace()
 
     # Create distinct CAD layers with standard colors
     doc.layers.add("PANEL_BORDER", color=7)   # White / Gray
-    doc.layers.add("PCB_OUTLINE", color=3)    # Green (solder mask edge)
-    doc.layers.add("PCB_HOLES", color=2)      # Yellow (drill holes / slots)
+    doc.layers.add("CNC_OUTLINE", color=3)    # Green (stock material edge)
+    doc.layers.add("CNC_HOLES", color=2)      # Yellow (drill holes / slots)
     doc.layers.add("TEXT_LABELS", color=4)    # Cyan
 
     # 1. Panel outer boundary
     panel_pts = [(0.0, 0.0), (panel_w, 0.0), (panel_w, panel_h), (0.0, panel_h)]
     msp.add_lwpolyline(panel_pts, close=True, dxfattribs={"layer": "PANEL_BORDER"})
 
-    # 2. Placed PCB parts
+    # 2. Placed CNC parts
     text_height = max(1.5, min(panel_w, panel_h) * 0.02)
     for p in placements_data:
         # Outer outline
-        msp.add_lwpolyline(p["outline"], close=True, dxfattribs={"layer": "PCB_OUTLINE"})
+        msp.add_lwpolyline(p["outline"], close=True, dxfattribs={"layer": "CNC_OUTLINE"})
         # Internal holes / cutouts
         for hole in p.get("holes", []):
-            msp.add_lwpolyline(hole, close=True, dxfattribs={"layer": "PCB_HOLES"})
+            msp.add_lwpolyline(hole, close=True, dxfattribs={"layer": "CNC_HOLES"})
         # Text label at part centroid
         if p["outline"]:
             cx = sum(pt[0] for pt in p["outline"]) / len(p["outline"])
@@ -308,7 +308,7 @@ def _timed_bottom_left_fill(
 
 
 class PanelizerHandler(SimpleHTTPRequestHandler):
-    """HTTP request handler for SqueezeNest PCB Panelization Demo."""
+    """HTTP request handler for SqueezeNest CNC Panelization Demo."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, directory=str(DEMO_DIR), **kwargs)
@@ -601,7 +601,7 @@ class PanelizerHandler(SimpleHTTPRequestHandler):
                     })
 
             if not ingested_parts_meta:
-                diag_msg = ["No valid closed PCB polygons could be extracted from the uploaded DXF(s)."]
+                diag_msg = ["No valid closed CNC polygons could be extracted from the uploaded DXF(s)."]
                 for diag in dxf_diagnostics:
                     diag_msg.append(f"\n• File '{diag['filename']}':")
                     diag_msg.append(f"  - Layers: {', '.join(diag['layers']) or 'None'}")
@@ -782,7 +782,7 @@ def run_server(port: int = 8080) -> None:
     for p in range(port, port + 10):
         try:
             server = ThreadingHTTPServer(("127.0.0.1", p), PanelizerHandler)
-            print(f"SqueezeNest PCB Panelizer Demo running at http://localhost:{p}")
+            print(f"SqueezeNest CNC Panelizer Demo running at http://localhost:{p}")
             break
         except OSError:
             continue
@@ -799,7 +799,7 @@ def run_server(port: int = 8080) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run SqueezeNest PCB Panelizer Demo")
+    parser = argparse.ArgumentParser(description="Run SqueezeNest CNC Panelizer Demo")
     parser.add_argument("--port", type=int, default=8080, help="Port to listen on (default 8080)")
     args = parser.parse_args()
     run_server(args.port)
